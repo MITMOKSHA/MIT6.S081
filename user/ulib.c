@@ -103,6 +103,7 @@ memmove(void *vdst, const void *vsrc, int n)
 
   dst = vdst;
   src = vsrc;
+  // related to the memory address cover problem.
   if (src > dst) {
     while(n-- > 0)
       *dst++ = *src++;

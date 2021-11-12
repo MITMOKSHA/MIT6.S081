@@ -18,6 +18,7 @@ fmtname(char *path)
   if(strlen(p) >= DIRSIZ)
     return p;
   memmove(buf, p, strlen(p));
+  // if the path size less than DIRSIZ, we need to fill in ws to rest of path.
   memset(buf+strlen(p), ' ', DIRSIZ-strlen(p));
   return buf;
 }
