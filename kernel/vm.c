@@ -52,8 +52,8 @@ kvminit()
 void
 kvminithart()
 {
-  w_satp(MAKE_SATP(kernel_pagetable));
-  sfence_vma();
+  w_satp(MAKE_SATP(kernel_pagetable));  // set the root page-table directory address to satp resgister.
+  sfence_vma();  // flush the TLB
 }
 
 // Return the address of the PTE in page table pagetable
@@ -75,17 +75,17 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
     panic("walk");
 
   for(int level = 2; level > 0; level--) {
-    pte_t *pte = &pagetable[PX(level, va)];
+    pte_t *pte = &pagetable[PX(level, va)];   // fetch PET at the next level.
     if(*pte & PTE_V) {
-      pagetable = (pagetable_t)PTE2PA(*pte);
+      pagetable = (pagetable_t)PTE2PA(*pte);  // get the next level pagetable address.
     } else {
-      if(!alloc || (pagetable = (pde_t*)kalloc()) == 0)
-        return 0;
+      if(!alloc || (pagetable = (pde_t*)kalloc()) == 0)  // use short circuit logic
+        return 0;  // no physical space for allocation.
       memset(pagetable, 0, PGSIZE);
-      *pte = PA2PTE(pagetable) | PTE_V;
+      *pte = PA2PTE(pagetable) | PTE_V;    // 44bits + 10bits
     }
   }
-  return &pagetable[PX(0, va)];
+  return &pagetable[PX(0, va)];  // return the PTE in lowest layer.
 }
 
 // Look up a virtual address, return the physical address,

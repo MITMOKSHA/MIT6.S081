@@ -27,7 +27,7 @@ void
 kinit()
 {
   initlock(&kmem.lock, "kmem");
-  freerange(end, (void*)PHYSTOP);
+  freerange(end, (void*)PHYSTOP);   // between first address after kernel and PHYSTOP.
 }
 
 void
@@ -36,7 +36,7 @@ freerange(void *pa_start, void *pa_end)
   char *p;
   p = (char*)PGROUNDUP((uint64)pa_start);
   for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE)
-    kfree(p);
+    kfree(p);  // put per page to free_list.
 }
 
 // Free the page of physical memory pointed at by v,
@@ -57,7 +57,7 @@ kfree(void *pa)
   r = (struct run*)pa;
 
   acquire(&kmem.lock);
-  r->next = kmem.freelist;
+  r->next = kmem.freelist;  /// add the element to list head.
   kmem.freelist = r;
   release(&kmem.lock);
 }
@@ -73,12 +73,12 @@ kalloc(void)
   acquire(&kmem.lock);
   r = kmem.freelist;
   if(r)
-    kmem.freelist = r->next;
+    kmem.freelist = r->next;  // shift next.
   release(&kmem.lock);
 
   if(r)
-    memset((char*)r, 5, PGSIZE); // fill with junk
-  return (void*)r;
+    memset((char*)r, 5, PGSIZE); // fill with junk, initialize?
+  return (void*)r;    // run out of the physical memory.
 }
 
 uint64
