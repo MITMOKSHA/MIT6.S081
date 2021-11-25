@@ -12,6 +12,8 @@ struct proc proc[NPROC];
 
 struct proc *initproc;
 
+extern pagetable_t kernel_pagetable;
+
 int nextpid = 1;
 struct spinlock pid_lock;
 
@@ -34,11 +36,11 @@ procinit(void)
       // Allocate a page for the process's kernel stack.
       // Map it high in memory, followed by an invalid
       // guard page.
-      char *pa = kalloc();
+      char *pa = kalloc();   // allocate physical memory per page.
       if(pa == 0)
         panic("kalloc");
-      uint64 va = KSTACK((int) (p - proc));
-      kvmmap(va, (uint64)pa, PGSIZE, PTE_R | PTE_W);
+      uint64 va = KSTACK((int) (p - proc));  // virtual address.
+      kvmmap(va, (uint64)pa, PGSIZE, PTE_R | PTE_W);  // mapped.
       p->kstack = va;
   }
   kvminithart();
@@ -120,6 +122,22 @@ found:
     release(&p->lock);
     return 0;
   }
+  // kernel page table
+  p->pkpagetable = ukvmcreate();
+  if (p->pkpagetable == 0) {
+    freeproc(p);
+    release(&p->lock);
+    return 0;
+  }
+
+  char *pa = kalloc();
+  if (pa == 0)
+    panic("kalloc");
+  uint64 va = KSTACK((int)(p - proc));
+  // make sure each process's kernel page table has a mapping
+  // for that process's kernel stack.
+  uvmmap(p->pkpagetable, va, (uint64)pa, PGSIZE, PTE_R | PTE_W);
+  p->kstack = va;
 
   // Set up new context to start executing at forkret,
   // which returns to user space.
@@ -141,6 +159,19 @@ freeproc(struct proc *p)
   p->trapframe = 0;
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
+
+  // free stack mapping for processes's kernel_pagetable.
+  if(p->kstack) {
+    uint64 pa = walkaddr(p->pkpagetable, p->kstack);
+    if (pa == 0)
+      panic("freeproc: kstack");
+    kfree((void*)pa);
+  }
+  p->kstack = 0;
+
+  if(p->pkpagetable)
+    freewalk(p->pkpagetable);
+
   p->pagetable = 0;
   p->sz = 0;
   p->pid = 0;
@@ -473,6 +504,11 @@ scheduler(void)
         // before jumping back to us.
         p->state = RUNNING;
         c->proc = p;
+
+        //  load the process's kernel page table into the core's satp register.
+        w_satp(MAKE_SATP(p->pkpagetable));
+        sfence_vma();   // flush the TLB.
+        
         swtch(&c->context, &p->context);
 
         // Process is done running for now.
@@ -486,7 +522,9 @@ scheduler(void)
 #if !defined (LAB_FS)
     if(found == 0) {
       intr_on();
-      asm volatile("wfi");
+      // use kernel_pagetable when no process is running
+      kvminithart();
+      asm volatile("wfi");   // wait for interrupt.
     }
 #else
     ;
