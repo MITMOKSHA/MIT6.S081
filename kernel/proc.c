@@ -28,7 +28,7 @@ void
 procinit(void)
 {
   struct proc *p;
-  
+ 
   initlock(&pid_lock, "nextpid");
   for(p = proc; p < &proc[NPROC]; p++) {
       initlock(&p->lock, "proc");
@@ -36,12 +36,12 @@ procinit(void)
       // Allocate a page for the process's kernel stack.
       // Map it high in memory, followed by an invalid
       // guard page.
-      char *pa = kalloc();   // allocate physical memory per page.
-      if(pa == 0)
-        panic("kalloc");
-      uint64 va = KSTACK((int) (p - proc));  // virtual address.
-      kvmmap(va, (uint64)pa, PGSIZE, PTE_R | PTE_W);  // mapped.
-      p->kstack = va;
+      // char *pa = kalloc();   // allocate physical memory per page.
+      // if(pa == 0)
+      //   panic("kalloc");
+      // uint64 va = KSTACK((int) (p - proc));  // virtual address.
+      // kvmmap(va, (uint64)pa, PGSIZE, PTE_R | PTE_W);  // mapped.
+      // p->kstack = va;
   }
   kvminithart();
 }
@@ -122,18 +122,20 @@ found:
     release(&p->lock);
     return 0;
   }
-  // kernel page table
+  // create process's kernel page table
   p->pkpagetable = ukvmcreate();
   if (p->pkpagetable == 0) {
     freeproc(p);
     release(&p->lock);
     return 0;
   }
-
-  char *pa = kalloc();
-  if (pa == 0)
+  // Allocate a page for the process's kernel stack.
+  // Map it high in memory, followed by an invalid
+  // guard page.
+  char *pa = kalloc();   // allocate physical memory per page.
+  if(pa == 0)
     panic("kalloc");
-  uint64 va = KSTACK((int)(p - proc));
+  uint64 va = KSTACK((int) (p - proc));  // virtual address.
   // make sure each process's kernel page table has a mapping
   // for that process's kernel stack.
   uvmmap(p->pkpagetable, va, (uint64)pa, PGSIZE, PTE_R | PTE_W);
@@ -161,17 +163,18 @@ freeproc(struct proc *p)
     proc_freepagetable(p->pagetable, p->sz);
 
   // free stack mapping for processes's kernel_pagetable.
-  if(p->kstack) {
-    uint64 pa = walkaddr(p->pkpagetable, p->kstack);
-    if (pa == 0)
-      panic("freeproc: kstack");
-    kfree((void*)pa);
+  if (p->kstack) {
+    pte_t* pte = walk(p->pkpagetable, p->kstack, 0);
+    if (pte == 0)
+      panic("freeproc: walk");
+    kfree((void*)PTE2PA(*pte));
   }
   p->kstack = 0;
 
-  if(p->pkpagetable)
-    freewalk(p->pkpagetable);
-
+  if(p->pkpagetable) {
+    freeukpagetable(p->pkpagetable);
+  }
+  p->pkpagetable = 0;
   p->pagetable = 0;
   p->sz = 0;
   p->pid = 0;
@@ -251,6 +254,7 @@ userinit(void)
   // and data into it.
   uvminit(p->pagetable, initcode, sizeof(initcode));
   p->sz = PGSIZE;
+  copyupttokpt(p->pkpagetable, p->pagetable, 0, PGSIZE);
 
   // prepare for the very first "return" from kernel to user.
   p->trapframe->epc = 0;      // user program counter
@@ -274,13 +278,19 @@ growproc(int n)
 
   sz = p->sz;
   if(n > 0){
+    if ((sz + n) >= PLIC) return -1; // test overflow.
+    // mapping the n bytes in process's kernel table.
     if((sz = uvmalloc(p->pagetable, sz, sz + n)) == 0) {
       return -1;
     }
+    copyupttokpt(p->pkpagetable, p->pagetable, sz-n, sz);
   } else if(n < 0){
     sz = uvmdealloc(p->pagetable, sz, sz + n);
+    // ummaping the n bytes in process's kernel table.
+    uvmunmap(p->pkpagetable, PGROUNDUP(sz), (PGROUNDUP(p->sz) - PGROUNDUP(sz))/PGSIZE, 0);
   }
   p->sz = sz;
+  
   return 0;
 }
 
@@ -304,9 +314,13 @@ fork(void)
     release(&np->lock);
     return -1;
   }
+
   np->sz = p->sz;
 
   np->parent = p;
+
+  copyupttokpt(np->pkpagetable, np->pagetable, 0, np->sz);
+
 
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
@@ -510,6 +524,8 @@ scheduler(void)
         sfence_vma();   // flush the TLB.
         
         swtch(&c->context, &p->context);
+        // use kernel_pagetable when no process is running
+        kvminithart();
 
         // Process is done running for now.
         // It should have changed its p->state before coming back.
@@ -522,8 +538,6 @@ scheduler(void)
 #if !defined (LAB_FS)
     if(found == 0) {
       intr_on();
-      // use kernel_pagetable when no process is running
-      kvminithart();
       asm volatile("wfi");   // wait for interrupt.
     }
 #else
