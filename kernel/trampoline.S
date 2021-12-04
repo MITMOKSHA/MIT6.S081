@@ -82,7 +82,7 @@ uservec:
         # table does not specially map p->tf.
 
         # jump to usertrap(), which does not return
-        jr t0
+       jr t0
 
 .globl userret
 userret:

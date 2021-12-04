@@ -58,7 +58,7 @@ usertrap(void)
 
     // sepc points to the ecall instruction,
     // but we want to return to the next instruction.
-    p->trapframe->epc += 4;
+    p->trapframe->epc += 4;  // jump the ecall instruction, instruction length is 32 bits.
 
     // an interrupt will change sstatus &c registers,
     // so don't enable until done with those registers.
