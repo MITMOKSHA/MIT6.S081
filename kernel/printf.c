@@ -137,7 +137,7 @@ printfinit(void)
 void
 backtrace(void) {
   uint64 fp = r_fp();
-  uint64 ftop = PGROUNDUP(fp);
+  uint64 ftop = PGROUNDUP(fp);  // return next page addr of current addr.
   printf("backtrace:\n");
   while (fp < ftop) {
     printf("%p\n", *(uint64*)(fp-8));  // print return address.
