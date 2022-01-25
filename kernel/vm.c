@@ -523,7 +523,7 @@ copyupttokpt(pagetable_t ker, pagetable_t user, uint64 old_size, uint64 new_size
     if((pte_to = walk(ker, i, 1)) == 0)
       panic("copyupttokpt: walk");
     pa = PTE2PA(*pte_from);
-    // clear PTE_U bit.
+    // clear PTE_U bit because of kernel page table.
     flags = PTE_FLAGS(*pte_from) & (~PTE_U);
     *pte_to = PA2PTE(pa) | flags;
   }
