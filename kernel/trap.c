@@ -78,12 +78,12 @@ usertrap(void)
 
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2) {
-    if (!p->is_alarm_working) {
-      if (p->intervel == p->tick) {
-        p->tick = 0;
-        p->is_alarm_working = 1;
-        // save all the needed registers
-        p->saved_epc = p->trapframe->epc; // saved user program counter
+    if (!p->is_alarm_working && p->intervel > 0) {
+      if (p->intervel == p->tick) {  // expire
+        p->tick = 0;  // reset tick
+        p->is_alarm_working = 1;  // reprensent executed handler is not terminate.
+        // save all the needed registers.
+        p->saved_epc = p->trapframe->epc; // save return address.
         p->saved_ra = p->trapframe->ra;
         p->saved_sp = p->trapframe->sp;
         p->saved_gp = p->trapframe->gp;
@@ -115,7 +115,8 @@ usertrap(void)
         p->saved_s9 = p->trapframe->s9;
         p->saved_s10 = p->trapframe->s10;
         p->saved_s11 = p->trapframe->s11;
-        p->trapframe->epc = p->handler;  // epc is user program counter.
+        // epc register store the user program counter(PC).
+        p->trapframe->epc = p->handler;  // when returned, jump to execute handler.
       } else {
         p->tick++;
       }

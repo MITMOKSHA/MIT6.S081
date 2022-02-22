@@ -102,10 +102,12 @@ sys_sigalarm(void) {
   struct proc* p = myproc();
   int interval;
   uint64 handler;
+  // fetch syscall nth argument.
   if (argint(0, &interval) < 0)
     return -1;
   if (argaddr(1, &handler) < 0)
     return -1;
+  // initialize p's attribute.
   p->intervel = interval;
   p->handler = handler;
   return 0;

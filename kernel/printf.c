@@ -136,11 +136,11 @@ printfinit(void)
 
 void
 backtrace(void) {
-  uint64 fp = r_fp();
-  uint64 ftop = PGROUNDUP(fp);  // return next page addr of current addr.
+  uint64 fp = r_fp();  // r_fp() return the fp of current execute function
+  uint64 ftop = PGROUNDUP(fp);  // get the top addr of stack frame page.
   printf("backtrace:\n");
   while (fp < ftop) {
-    printf("%p\n", *(uint64*)(fp-8));  // print return address.
-    fp = *(uint64*)(fp-16);   //  prev frame fp.
+    printf("%p\n", *(uint64*)(fp-8));  // print return address stored in (fp-8).
+    fp = *(uint64*)(fp-16);   //  update fp to previous frame fp.
   }
 }
