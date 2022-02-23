@@ -47,12 +47,11 @@ sys_sbrk(void)
   if(argint(0, &n) < 0)
     return -1;
   addr = myproc()->sz;
-  // ==========task1===========
+
   myproc()->sz += n;
-  // if(growproc(n) < 0)
+  // if(growproc(n) < 0)  // Not need to allocate pysical memory.
   //   return -1;
-  // ==========================
-  return addr;
+  return addr;  // return the old size of process
 }
 
 uint64
