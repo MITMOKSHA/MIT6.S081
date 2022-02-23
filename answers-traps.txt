@@ -1,8 +1,7 @@
 1. a2
-2. 
-3. 0000000000000630
-4. 0
-5. He110 world
-   0x726c6400
-   nope
-6. 
+2. Complier maxmize the procedure to inline func g to f and f to main. 
+3. 0x640
+4. 0x38
+5. He110, World
+6. 0x726c6400
+7. The second argument will hold the value that the a2 register originally have.
