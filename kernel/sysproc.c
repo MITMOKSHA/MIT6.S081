@@ -47,8 +47,11 @@ sys_sbrk(void)
   if(argint(0, &n) < 0)
     return -1;
   addr = myproc()->sz;
-
-  myproc()->sz += n;
+  if (n < 0) {
+    myproc()->sz = uvmdealloc(myproc()->pagetable, addr, addr+n);  // dealloc user page.
+  } else {
+    myproc()->sz = addr + n;
+  }
   // if(growproc(n) < 0)  // Not need to allocate pysical memory.
   //   return -1;
   return addr;  // return the old size of process

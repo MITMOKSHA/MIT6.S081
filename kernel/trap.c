@@ -67,15 +67,28 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
+  } else if (r_scause() == 13 || r_scause() == 15) {
+    // check whether a fault is a page fault
+    uint64 va = r_stval();
+    // printf("page fault: %p\n", va);  // auxiliary function
+    // lazy allocation before printf information.
+    if (va >= p->sz || // page-faults va higher than any located with sbrk.
+        va <= PGROUNDDOWN(p->trapframe->sp) ||  // page-fualts on the invalid page below the user stack
+        va >= MAXVA) {
+      p->killed = 1;
+    } else {
+      char* mem = kalloc();  // allocate one page of physical memory. 
+      if (mem == 0) {  // if kaaloc() fails, kill current process.
+        p->killed = 1;
+      } else {
+        memset(mem, 0, PGSIZE);  // set all zeros.
+        if (mappages(p->pagetable, PGROUNDDOWN(va), PGSIZE, (uint64)mem, PTE_W|PTE_R|PTE_U) != 0) {
+          kfree(mem);
+          p->killed = 1;
+        }
+      }
+    }
   } else {
-    // ===============task2===================
-    char* mem = kalloc();
-    memset(mem, 0, PGSIZE);
-    mappages(p->pagetable, PGROUNDDOWN(r_stval()), PGSIZE, (uint64)mem, PTE_W|PTE_X|PTE_R|PTE_U);
-    if (r_scause() == 13 || r_scause() == 15)  // check whether a fault is a page fault
-    
-      printf("error: page fault\n");
-    // =======================================
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     p->killed = 1;
@@ -87,7 +100,7 @@ usertrap(void)
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2)
     yield();
-
+    
   usertrapret();
 }
 
